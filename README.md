@@ -1,53 +1,73 @@
 # 💳 Credit Card Fraud Detection
 
-> *"Out of 10,000 transactions, maybe 5 are fraud. Find them without crying wolf on the other 9,995."*
+> *"Out of 284,807 transactions, 492 are fraud. Find them without crying wolf on the other 284,315."*
 
-This is the problem that taught me how **class imbalance** really works. In fraud detection, catching fraud matters far more than overall accuracy — a model that's 99.9% "accurate" but misses all fraud is useless. This project digs into precision, recall, and the F1/F2 trade-off properly.
+This is the project that taught me what class imbalance actually means. On real credit card transaction data, fraud is **0.17%** of all transactions. A model that answers "not fraud" every single time is 99.83% accurate and completely useless — and this repo shows you exactly that trap before showing the fix.
 
 ## What this project does
 
-- Loads a realistic transaction dataset with a severe imbalance (~0.5% fraud).
-- Handles imbalance with **SMOTE** (synthetic minority oversampling).
-- Trains **Random Forest** and compares it with a baseline.
-- Evaluates with precision/recall, F1, and the confusion matrix.
-- Shows how changing the decision threshold shifts the precision/recall balance.
+- Loads the real credit card transaction dataset (284,807 rows, 30 PCA features).
+- Demonstrates why accuracy and ROC-AUC both hide the problem here.
+- Applies **SMOTE** to oversample the minority class during training only.
+- Trains Random Forest and class-weighted Logistic Regression.
+- Sweeps the decision threshold to find the real precision/recall trade-off.
+- Reports average precision and plots the precision-recall curve.
 
 ## The dataset
 
-Synthetic but realistic (`data/transactions.csv`), ~20,000 transactions:
+[Credit Card Fraud Detection](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud) via OpenML — European cardholders, September 2013, two days of transactions.
 
-| Feature                | Description                          |
-|------------------------|--------------------------------------|
-| `amount`               | Transaction amount ($)               |
-| `hour`                 | Hour of day (0–23)                   |
-| `merchant_risk`        | Merchant risk score (0–1)            |
-| `distance_km`          | Distance from home (km)              |
-| `foreign_transaction`  | 1 if international, else 0           |
-| `is_fraud`             | Target (1 = fraud)                   |
+| Column | Description |
+|---|---|
+| `Time` | Seconds since first transaction |
+| `V1`–`V28` | PCA components (original values are confidential) |
+| `Amount` | Transaction amount |
+| `Class` | 1 = fraud, 0 = legitimate — **target** |
+
+Fraud rate: **0.172%** (492 of 284,807).
 
 ## How to run it
 
 ```bash
 pip install -r requirements.txt
 
-# Generate data + full pipeline + evaluation
-python fraud.py
+python fraud.py    # load, apply SMOTE, train, sweep thresholds
+```
 
-# Visualise the imbalance
-python explore.py
+## Project structure
+
+```
+credit-card-fraud-detection/
+├── data/
+│   └── transactions.csv
+├── src/
+│   ├── load_data.py   # fetch + cache
+│   ├── train_model.py # SMOTE pipeline + threshold sweep
+│   └── explore.py
+├── tests/
+├── fraud.py
+├── requirements.txt
+└── README.md
 ```
 
 ## What I learned
 
-- Why accuracy is the *wrong* metric here — and precision/recall are right.
-- What SMOTE does under the hood and when it helps (and when it doesn't).
-- How to tune the decision threshold instead of just taking 0.5.
-- That real-world data is almost never clean or balanced.
+- That a 99.83%-accurate model can be worthless, and how to prove it in one line.
+- Why ROC-AUC flatters you on severe imbalance, and why average precision doesn't.
+- What SMOTE actually does — synthesising minority points in feature space — and that it must only ever touch the training split.
+- That the threshold is a business decision, not a modelling one. Moving it from 0.5 to 0.688 changed recall from ~0.68 to 0.806.
 
 ## Results
 
-With SMOTE and threshold tuning, the model catches **~85–90% of fraud** while keeping false alarms low. The key insight: remember it's a trade-off, and you pick the point that matches the business cost.
+20% stratified test split, 98 fraud cases in the test set:
+
+| Model | Average Precision | Best F1 | Precision | Recall |
+|---|---|---|---|---|
+| **RandomForest** | **0.878** | **0.873** | 0.952 | 0.806 |
+| LogisticRegression | 0.722 | 0.825 | 0.833 | 0.816 |
+
+Random Forest at its tuned threshold caught **79 of 98** fraud transactions while raising only **4** false alarms out of 56,864. That trade-off is genuinely good — but the point of the project is that *you* choose where to sit on that curve.
 
 ---
 
-*Built with Python, pandas, scikit-learn, imbalanced-learn, matplotlib. Made for learning, by a student, for students.*
+*Built with Python, pandas, scikit-learn, imbalanced-learn, matplotlib. Real transaction data, honestly measured.*
